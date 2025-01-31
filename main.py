@@ -22,7 +22,7 @@ class CryptoConverter(QWidget):
             h_layout = QHBoxLayout()
             label = QLabel(currency)
             input_field = QLineEdit("0")
-            input_field.textChanged.connect(self.update_conversions)
+            input_field.textChanged.connect(self.update_conversions2)
             h_layout.addWidget(label)
             h_layout.addWidget(input_field)
             self.layout.addLayout(h_layout)
@@ -40,23 +40,70 @@ class CryptoConverter(QWidget):
         self.refresh_conversion_rates()
         self.refresh_xrp_value()
 
+        # self.update_conversions()
+
+        self.init_conversion()
+
+    def update_conversions2(self):
+        for currency in self.currencies:
+            if self.currency_inputs[currency].hasFocus():
+                print(f"Currency: {currency}")
+                changed_currency = self.currency_inputs[currency].text()
+                print(f"Currency {currency}: {changed_currency}")
+
+                # Get the exchange rate of dollars
+                exchange_rate = self.exchange_rate_data[currency]
+                print(f"Exchange Rate: {exchange_rate}")
+
+                new_usd_value = float(changed_currency) / exchange_rate
+
+                self.currency_inputs["USD"].setText(str(new_usd_value))
+
+                # We are going through the currencies and updating the value of the currency based on the new USD value calculated. We are not changing the focused currency
+                for target_currency in self.currencies:
+                    if target_currency != currency and target_currency != "USD" and target_currency != "XRP":
+                        target_currency_value = new_usd_value * self.exchange_rate_data[target_currency]
+                        print(f"Target Currency: {target_currency} - Value: {target_currency_value}")
+                        self.currency_inputs[target_currency].setText(str(target_currency_value))
+
+                # For each of the currency that have not the focus, we will update their value by first calculating the value in dollars and then apply the exchange rate
+                # for target_currency in self.currencies:
+                #     if target_currency != currency:
+                #         print(f"Target Currency: {target_currency}")
+                #         if target_currency == "XRP":
+                #             # target_currency_value = float(changed_currency) / self.xrp_value
+                #             target_currency_value = 66666
+                #             pass
+                #         else:
+                #             target_currency_value = float(changed_currency) / self.exchange_rate_data[currency]
+                #             print(f"changed currency: {changed_currency} --> Exchange Rate: {self.exchange_rate_data[currency]} --> Target Currency Value: {target_currency_value}")
+                #             print(f"Curr: {currency} - Target: {target_currency} - Value: {target_currency_value}")
+                #         self.currency_inputs[target_currency].setText(str(target_currency_value))
+
+    def init_conversion(self):
         # Set default value of 1 XRP
         self.currency_inputs["XRP"].setText("1")
-        self.update_conversions()
+
+        for currency in self.currencies:
+            if currency != "XRP":
+                value = self.xrp_value * self.exchange_rate_data[currency]
+                self.currency_inputs[currency].setText(str(value))
+                print(f"Currency : {currency} --> {self.exchange_rate_data[currency]}")
 
     def refresh_conversion_rates(self):
         self.exchange_rate_cache = ExchangeRateCache()
         self.exchange_rate_data = self.exchange_rate_cache.get_exchange_rate(True)
         print(f"Exchange Rates: {self.exchange_rate_data}")  # Debug print
-        self.update_conversions()
+        # self.update_conversions()
 
     def refresh_xrp_value(self):
         self.crypto_price = CryptoPrice(currency="usd")
         self.xrp_value = self.crypto_price.get_xrp_value()
         print(f"XRP Value: {self.xrp_value}")  # Debug print
-        self.update_conversions()
+        # self.update_conversions()
 
     def update_conversions(self):
+        print("Calling update_conversions")
         amount = 1.0
         base_currency = "XRP"
 
@@ -68,17 +115,17 @@ class CryptoConverter(QWidget):
                     amount = float(self.currency_inputs[currency].text())
                     base_currency = currency
                     break
-            else:
-                print("No currency input focused")
-                if self.currency_inputs["XRP"].text() == "0":
-                    print("Amount is 0")
-                    amount = 1.0
                 else:
-                    amount = float(self.currency_inputs["XRP"].text())
+                    print("No currency input focused")
+                    if self.currency_inputs["XRP"].text() == "0":
+                        print("Amount is 0")
+                        amount = 1.0
+                    else:
+                        amount = float(self.currency_inputs["XRP"].text())
 
-                print(f"Amount: {self.currency_inputs['XRP'].text()}")
-                # amount = float(self.currency_inputs["XRP"].text())
-                base_currency = "XRP"
+                    print(f"Amount: {self.currency_inputs['XRP'].text()}")
+                    # amount = float(self.currency_inputs["XRP"].text())
+                    base_currency = "XRP"
         except ValueError:
             amount = 1.0
             base_currency = "XRP"

@@ -13,8 +13,8 @@ class ExchangeRateCache:
 
         self.rates = {
             "USD": 1.0,  # Example rates
-            "AUD": 1.3,
-            "EUR": 0.85,
+            "AUD": 1.61,
+            "EUR": 0.96,
         }
 
     def load_cache(self):
