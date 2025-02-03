@@ -13,7 +13,9 @@ class CryptoPrice:
             response = requests.get(url, params=params)
             response.raise_for_status()  # Raise an HTTPError for bad responses
             data = response.json()
+            print("---------------------------------------")
             p.pprint(data)
+            print("---------------------------------------")
             return data["ripple"][self.currency]
         except requests.exceptions.RequestException as e:
             print(f"Error fetching XRP value: {e}")
