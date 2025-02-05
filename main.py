@@ -1,5 +1,6 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+
 from classes.currency import ExchangeRateCache
 from classes.crypto import CryptoPrice
 import pprint as p
@@ -12,12 +13,13 @@ class CryptoConverter(QWidget):
         self.xrp_value = None
         self.exchange_rate_data = None
 
-        # Get the exchange rate data
         self.crypto_price = CryptoPrice(currency="usd")
-        self.filtered_rates = self.crypto_price.convert_btc_to_xrp_based_currency()
+        self.filtered_rates, self.xrp_value = self.crypto_price.convert_btc_to_xrp_based_currency()
+        self.exchange_rate_data = self.filtered_rates  # Set exchange_rate_data to filtered_rates
 
         print("-------------------------------------")
         p.pprint(self.filtered_rates)
+        print(f"XRP Value: {self.xrp_value}")
         print("-------------------------------------")
 
         self.initUI()
@@ -34,10 +36,13 @@ class CryptoConverter(QWidget):
 
             for target_currency in self.currency_inputs:
                 if target_currency != source_currency:
+                    input_field = self.currency_inputs[target_currency]
+                    input_field.blockSignals(True)  # Temporarily block signals to avoid recursion
                     converted_value = self.convert_currency(source_currency, target_currency, amount)
                     if converted_value is not None:
                         formatted_value = f"{converted_value:.10f}"  # Format to 10 decimal places
-                        self.currency_inputs[target_currency].setText(formatted_value)
+                        input_field.setText(formatted_value)
+                    input_field.blockSignals(False)  # Re-enable signals
 
     def initUI(self):
         self.setWindowTitle("Crypto Converter")
@@ -75,35 +80,50 @@ class CryptoConverter(QWidget):
         now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         self.last_refresh_label.setText(f"Last Refresh: {now}")
 
+    def refresh_conversion_rates(self):
+        try:
+            self.filtered_rates, self.xrp_value = self.crypto_price.convert_btc_to_xrp_based_currency()
+            self.exchange_rate_data = self.filtered_rates  # Update exchange_rate_data
+
+            if self.filtered_rates is not None:
+                for currency, rate in self.filtered_rates.items():
+                    if currency.upper() in self.currency_inputs:
+                        input_field = self.currency_inputs[currency.upper()]
+                        input_field.blockSignals(True)  # Temporarily block signals
+                        formatted_rate = f"{rate:.10f}"  # Format to 10 decimal places
+                        input_field.setText(formatted_rate)
+                        input_field.blockSignals(False)  # Re-enable signals
+                self.update_last_refresh_time()
+        except Exception as e:
+            if str(e) == "Too Many Requests":
+                self.show_error_message("Too Many Requests", "You have made too many requests to the API. Please try again later.")
+
+    def show_error_message(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec()
+
     def convert_currency(self, source_currency, target_currency, amount):
         if source_currency == "XRP":
             usd_value = amount * self.xrp_value
         else:
-            exchange_rate = self.exchange_rate_data.get(source_currency, None)
+            exchange_rate = self.exchange_rate_data.get(source_currency.lower(), None)
             if exchange_rate is None:
                 print(f"Exchange rate for {source_currency} not found.")
                 return None
-            usd_value = amount / exchange_rate
+            usd_value = amount * exchange_rate
 
         if target_currency == "XRP":
             return usd_value / self.xrp_value
         else:
-            exchange_rate = self.exchange_rate_data.get(target_currency, None)
+            exchange_rate = self.exchange_rate_data.get(target_currency.lower(), None)
             if exchange_rate is None:
                 print(f"Exchange rate for {target_currency} not found.")
                 return None
-            return usd_value * exchange_rate
-
-    def refresh_conversion_rates(self):
-        self.filtered_rates = self.crypto_price.convert_btc_to_xrp_based_currency()
-
-        if self.filtered_rates is not None:
-            for currency, rate in self.filtered_rates.items():
-                if currency.upper() in self.currency_inputs:
-                    formatted_rate = f"{rate:.6f}"  # Format to 10 decimal places
-                    self.currency_inputs[currency.upper()].setText(formatted_rate)
-
-            self.update_last_refresh_time()
+            return usd_value / exchange_rate
 
 
 if __name__ == "__main__":
